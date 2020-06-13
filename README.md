@@ -17,4 +17,7 @@ Our research focuses on tackling a wide range of questions into the impacts of d
 
 [Data_Value/](Data_Value/) - tools for scoring the value of individual data in a dataset. 
 
+[Data_3D/](Data_3D/) - classes and notes for Pytorch3D
+
 [Utils/](Utils/) - Contains model definitions, training and evaluation scripts.  
+
