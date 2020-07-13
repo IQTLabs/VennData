@@ -2,6 +2,8 @@ import numpy as np
 import torch 
 import math 
 
+from scipy.stats import chi2
+
 class Detector():
     
     def __init__(self,epsilon,model,device,class_size):
@@ -13,6 +15,9 @@ class Detector():
         
         self.set_lambda_values(math.nan)
                 
+        self.x = 0
+        self.y = 0
+        
     #getters and setters
     def get_epsilon(self):
         
@@ -54,13 +59,40 @@ class Detector():
         
         self.lambda_values = lambda_values
     
-    def set_detector_lambda_values(self,data_loader):
+    def set_covariance(self):
+        
+        eps           = self.get_epsilon()
+        lambda_values = self.get_lambda_values()
+        class_size    = self.get_class_size()
+        
+        self.P = (((1-eps)**2)/(1-(1-eps)**2))*(lambda_values-lambda_values**2)*np.identity(class_size)
+       
+    def get_covariance(self):
+        
+        return self.P
     
-        # Function: set_detector_lambda_values
+    def set_threshold(self,false_alarm_rate):
+        
+        class_size = self.get_class_size()
+        
+        bins = np.linspace(0,5*class_size,int(1e4))
+        
+        p_g  = chi2.pdf(bins,class_size)
+        P_g  = 1-np.cumsum(p_g)/np.sum(p_g)
+        
+        self.thresh = bins[np.where(np.abs(P_g-false_alarm_rate)==np.abs(P_g-false_alarm_rate).min())]
+        
+    def get_threshold(self):
+        
+        return self.thresh
+       
+    def calculate_dataset_lambda_values(self,data_loader):
+    
+        # Function: calculate_dataset_lambda_values
         # Inputs:   data_loader  (Pytorch dataloader)
-        # Process: sets the lambda values for the detector
+        # Process: calculates the lambda values for the dataset
         # Used Functions: calculate_lambda
-        # Output:   none
+        # Output:   lambda (array)
         
         x = np.zeros([10,len(data_loader)])
         n = 0
@@ -87,7 +119,7 @@ class Detector():
 
         lambda_values_model = self.calculate_lambda(model_labels,torch.Tensor(np.arange(0,10)).int())
         
-        self.set_lambda_values(lambda_values_model)
+        return lambda_values_model
     
     def calculate_lambda(self,labels,label_vals):
 
@@ -118,7 +150,7 @@ class Detector():
         x = x + lambda_values
         return x
 
-    def LambdaFilterTransition(self,x,y,epsilon):
+    def LambdaFilterTransition(self,x,y):
 
         # Function: LambdaFilterTransition
         # Inputs:   x           (numpy array) size=(class_size)
@@ -147,7 +179,7 @@ class Detector():
         y = y + observation_lambda_values
         return y
 
-    def Residual(x,y):
+    def Residual(self,x,y):
 
         # Function: LambdaObservation
         # Inputs:   x           (numpy array) size=(class_size)
@@ -155,10 +187,25 @@ class Detector():
         # Process: finds error between true label frequency and predicted label frequency
         # Output:   r           (float) 
 
-        r = np.linalg.norm(x-y)
+        P = self.get_covariance()
+        r = np.matmul(np.matmul((x-y),np.linalg.inv(P)),(x-y))
+        
+        return r
+    
+    def ResidualClasses(self,x,y):
+
+        # Function: LambdaObservation
+        # Inputs:   x           (numpy array) size=(class_size)
+        #           y           (numpy array) size=(class_size)
+        # Process: finds error between true label frequency and predicted label frequency
+        # Output:   r           (float) 
+
+        P = self.get_covariance()
+        r = np.matmul(np.linalg.inv(P),np.power(x-y,2))
+        
         return r
 
-    def runDetector(self,data_loader,numIter):
+    def runDetector(self,data_loader,numIter,numEpoch):
 
         # Function: runDetector
         # Inputs:   model         (Pytorch Neural Network) 
@@ -172,50 +219,106 @@ class Detector():
         #                  Residual                   (3)
         #                  LambdaFilterTransition     (4)
         # Output:   r           (float) 
+        #           correct_array (array)
         #           accuracy    (float) 
 
-        k = 0
-
-        x = np.zeros([len(lambda_values),numIter])
-        y = np.zeros([len(lambda_values),numIter])
-        r = np.zeros([numIter])
-
-        percent_done  = 10
-        correct_array = np.zeros(numIter)
-        
         lambda_values = self.get_lambda_values()
-        epsilon       = self.get_epsilon()
         device        = self.get_device()
+        model         = self.get_model()
         
-        for image_batch, label_batch in data_loader:
+        accuracy = []
+        
+        x = np.zeros([len(lambda_values)])
+        y = np.zeros([len(lambda_values)])
+        r = []
 
-            model.eval()
+        for epoch in range(numEpoch):
+            
+            percent_done  = 10
+            correct_array = np.zeros(numIter)
+            
+            k = 0
+            
+            for image_batch, label_batch in data_loader:
 
-            if len(image_batch.size()) == 4:
-                output       = self.model(image_batch.to(device))
-            elif len(image_batch.size()) == 3:
-                output       = self.model(image_batch.unsqueeze(0).to(device))
+                model.eval()
 
-            _, predicted = torch.max(output.data, 1)
+                if len(image_batch.size()) == 4:
+                    output       = model(image_batch.to(device))
+                elif len(image_batch.size()) == 3:
+                    output       = model(image_batch.unsqueeze(0).to(device))
 
-            x[:,k+1] = self.LambdaPredictionTransition(x[:,k],lambda_values) #(1)
-            y[:,k+1] = self.LambdaObservation(y[:,k],predicted)              #(2)
-            r[k]     = self.Residual(x[:,k+1],y[:,k+1])                      #(3)
-            x[:,k+1] = self.LambdaFilterTransition(x[:,k+1],y[:,k+1],epsilon)#(4)
+                _, predicted = torch.max(output.data, 1)
 
-            k += 1
+                x = self.LambdaPredictionTransition(x)       #(1)
+                y = self.LambdaObservation(y,predicted)      #(2)
+                
+                r.append(self.Residual(x,y))                 #(3)
+                
+                x = self.LambdaFilterTransition(x,y)         #(4)
+                
+                k += 1
 
-            correct_array[k] = (predicted.cpu() == label_batch).sum().item()
+                correct_array[k] = (predicted.cpu() == label_batch).sum().item()
 
-            if k % (numIter/10) == 0:
-                print(str(percent_done) + '% Percent Done')
-                percent_done += 10
+                if k % (numIter/10) == 0:
+                    print(str(percent_done) + '% Percent Done')
+                    percent_done += 10
 
-            if k-1 == numIter:
-                break
-
-        accuracy = np.mean(correct_array)
+                if k == numIter-1:
+                    break
+                    
+            accuracy.append(np.mean(correct_array))
 
         return r,correct_array,accuracy
+    
+    def analyzeSignal(self,x,y,input_img):
+
+        # Function: analyzeSignal
+        # Inputs:   x         (Pytorch Neural Network) 
+        #           y        (Pytorch Device)
+        #           input_img   (Pytorch Tensor)    size=(1,features,height,width)
+        # Process:  tests if there is a shift in label distribution
+        # Used Functions:  LambdaPredictionTransition (1)
+        #                  LambdaObservation          (2)
+        #                  Residual                   (3)
+        #                  LambdaFilterTransition     (4)
+        # Output:   xPredict   (float) 
+        #           xFilter    (float) 
+        #           y          (float) 
+        #           r          (float) 
+        #           detection  (boolean) 
+        #           label_detection  (int array) 
+
+        lambda_values = self.get_lambda_values()
+        device        = self.get_device()
+        model         = self.get_model()
+        thresh        = self.get_threshold()
+        
+        model.eval()
+
+        if len(input_img.size()) == 4:
+            output = model(input_img.to(device))
+        elif len(input_img.size()) == 3:
+            output = model(input_img.unsqueeze(0).to(device))
+
+        _, predicted = torch.max(output.data, 1)
+
+        xPredict = self.LambdaPredictionTransition(x)       #(1)
+        y        = self.LambdaObservation(y,predicted)      #(2)
+
+        g        = self.Residual(xPredict,y)                #(3)
+        r        = self.ResidualClasses(xPredict,y)         #(3)
+        
+        if g > thresh:
+            detection = True
+        else:
+            detection = False
+            
+        label_detections = np.array(r > 1,dtype=int)
+        
+        xFilter  = self.LambdaFilterTransition(xPredict,y)  #(4)
+
+        return xPredict,xFilter,y,g,r,detection,label_detections
     
     
