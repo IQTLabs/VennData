@@ -15,9 +15,11 @@ Our research focuses on tackling a wide range of questions into the impacts of d
 ### Structure
 [Data_augmentation/](Data_augmentation/) - Techniques and tools used to augment data for improved performance.
 
-[Data_Value/](Data_Value/) - tools for scoring the value of individual data in a dataset. 
+[Data_Value/](Data_Value/) - Tools for scoring the value of individual data in a dataset. 
 
-[Data_3D/](Data_3D/) - classes and notes for Pytorch3D
+[Data_Value/Data_selection](Data_Value/Data_selection) - Data selection models trained with reinforcement learning. 
+
+[Data_3D/](Data_3D/) - Classes and notes for Pytorch3D. 
 
 [Utils/](Utils/) - Contains model definitions, training and evaluation scripts.  
 

@@ -1,0 +1,13 @@
+torchvision==0.4.0
+visdom==0.1.8.9
+matplotlib==3.3.0
+numpy==1.18.5
+torch==1.2.0
+requests==2.24.0
+scipy==1.5.2
+tqdm==4.48.2
+Box2D==2.3.10
+gym==0.17.2
+imageio==2.9.0
+Pillow==7.2.0
+pyglet==1.5.7
