@@ -1,7 +1,6 @@
 # Data selection using reinforcement learning teacher models 
 
 ## Cifar10 Dataset
-First download splitted dataset.
 ```
 mkdir data
 cd data
