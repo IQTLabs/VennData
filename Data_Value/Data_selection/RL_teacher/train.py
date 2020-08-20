@@ -1,6 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
 import argparse
+from argparse import RawTextHelpFormatter
 
 import torch
 
@@ -34,7 +35,7 @@ def make_global_parameters(hparams):
 
 
 def main(hparams, run=None):
-    torch.cuda.set_device(1)
+    torch.cuda.set_device(0)
     # teacher train set 45%
     # teacher dev set 5%
     # student train set 50%
@@ -144,8 +145,8 @@ if __name__ == '__main__':
     # dataloader:  teacher_train/student_train/dev/test
     # models: teacher_configs/student_configs
     # optional: max_t, tau, threshold, M, max_non_increasing_steps, num_classes
-    parser = argparse.ArgumentParser(description='PyTorch Main Module')
-    parser.add_argument('--hparams', default='cifar10_l2t', type=str, help='Choose hyper parameter configuration. [cifar10_l2t, multi_cifar10_l2t, cifar10_l2t_augment, cifar10_l2t_vae]')
+    parser = argparse.ArgumentParser(description='Data selection using RL', formatter_class=RawTextHelpFormatter)
+    parser.add_argument('--hparams', default='cifar10_l2t', type=str, help='Choose hyper parameter configuration.\n[cifar10_l2t, multi_cifar10_l2t, cifar10_l2t_augment, cifar10_l2t_vae]')
     parser.add_argument('--run', type=str, help='experiment name')
 
     args = parser.parse_args()

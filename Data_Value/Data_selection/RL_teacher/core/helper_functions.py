@@ -11,7 +11,7 @@ def to_var(x, volatile=False, requires_grad=False):
         x = x.cuda()
     return Variable(x, volatile=volatile, requires_grad=requires_grad)
 
-vae = VAE(device='cuda:1').to('cuda:1')
+vae = VAE(device='cuda:0').to('cuda:0')
 vae.load_state_dict(torch.load('vae_model.pth'))
 vae.eval()
 for param in vae.parameters():
