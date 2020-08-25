@@ -69,7 +69,7 @@ def main(hparams, run=None, gpu_num=0):
         'student_configs': _student_configs,
         'teacher_configs': _teacher_configs
     }
-    use_vae = hparams.models['teacher_configs'].get('use_vae', False):
+    use_vae = hparams.models['teacher_configs'].get('use_vae', False)
     vae = None
     if use_vae:
         vae = VAE(device=device).to(device)
