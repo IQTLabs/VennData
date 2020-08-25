@@ -34,8 +34,10 @@ def make_global_parameters(hparams):
     # saver = Saver(saver_configs['init_best_metric'], saver_configs['metric_name'], hparams, saver_configs['output_path'])
 
 
-def main(hparams, run=None):
-    torch.cuda.set_device(0)
+def main(hparams, run=None, gpu_num=0):
+
+    device = torch.device('cuda:{}'.format(gpu_num) if torch.cuda.is_available() else 'cpu')
+    torch.cuda.set_device(gpu_num)
     # teacher train set 45%
     # teacher dev set 5%
     # student train set 50%
@@ -67,6 +69,14 @@ def main(hparams, run=None):
         'student_configs': _student_configs,
         'teacher_configs': _teacher_configs
     }
+    use_vae = hparams.models['teacher_configs'].get('use_vae', False):
+    vae = None
+    if use_vae:
+        vae = VAE(device=device).to(device)
+        vae.load_state_dict(torch.load('vae_model.pth'))
+        vae.eval()
+        for param in vae.parameters():
+            param.requires_grad = False
     model = TeacherStudentModel(_model_configs)
     model.train()
     model.cuda()
@@ -121,7 +131,9 @@ def main(hparams, run=None):
         'threshold': threshold,
         'M': M,
         'max_non_increasing_steps': max_non_increasing_steps,
-        'num_classes': num_classes
+        'num_classes': num_classes,
+        'use_vae': use_vae,
+        'vae': vae
     }
     print ('Fitting the teacher starts.............')
     model.fit_teacher(fit_configs)
@@ -148,12 +160,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Data selection using RL', formatter_class=RawTextHelpFormatter)
     parser.add_argument('--hparams', default='cifar10_l2t', type=str, help='Choose hyper parameter configuration.\n[cifar10_l2t, multi_cifar10_l2t, cifar10_l2t_augment, cifar10_l2t_vae]')
     parser.add_argument('--run', type=str, help='experiment name')
+    parser.add_argument('--gpu', type=int, help='gpu number', default=0)
 
     args = parser.parse_args()
     extra_info = None
     hparams = get_hparams(args.hparams)(extra_info)
 
     make_global_parameters(hparams)
+
     #print(hparams._items)
-    main(hparams, args.run)
+    main(hparams, args.run, args.gpu)
 

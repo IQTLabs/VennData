@@ -35,6 +35,7 @@ class TeacherStudentModel(nn.Module):
         init_params(self.student_net)
 
         self.is_vae_teacher = self.configs['teacher_configs'].get('use_vae', False)
+        #self.is_vae_teacher = self.configs['use_vae']
         if self.is_vae_teacher:
             self.teacher_net = TeacherNetworkExtended(configs['teacher_configs'])
         else:
@@ -102,6 +103,7 @@ class TeacherStudentModel(nn.Module):
         student_lr_scheduler = configs['lr_scheduler']['student']
         logger = configs['logger']
         writer = configs['writer']
+        vae = configs['vae']
 
         # ================== init tracking history ====================
         rewards = []
@@ -152,7 +154,8 @@ class TeacherStudentModel(nn.Module):
                             'max_iter': max_t,
                             'train_loss_history': training_loss_history,
                             'val_loss_history': val_loss_history,
-                            'use_vae': self.is_vae_teacher
+                            'use_vae': self.is_vae_teacher,
+                            'vae': vae
                         }
                         states, vae_z = state_func(state_configs)
                         _inputs = {'input': states.detach(), 'vae_z': vae_z}
@@ -462,7 +465,8 @@ class TeacherStudentModel(nn.Module):
                     'max_iter': max_t,
                     'train_loss_history': training_loss_history,
                     'val_loss_history': val_loss_history,
-                    'use_vae': self.is_vae_teacher
+                    'use_vae': self.is_vae_teacher,
+                    'vae': vae
                 }
                 states, vae_z = state_func(state_configs)  # TODO: implement the function for computing state
                 _inputs = {'input': states, 'vae_z':vae_z}

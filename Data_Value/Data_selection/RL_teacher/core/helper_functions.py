@@ -3,7 +3,7 @@ import torch
 import math
 import torch.nn as nn
 from torch.autograd import Variable
-from core.vae import VAE
+#from core.vae import VAE
 
 
 def to_var(x, volatile=False, requires_grad=False):
@@ -11,11 +11,13 @@ def to_var(x, volatile=False, requires_grad=False):
         x = x.cuda()
     return Variable(x, volatile=volatile, requires_grad=requires_grad)
 
+'''
 vae = VAE(device='cuda:0').to('cuda:0')
 vae.load_state_dict(torch.load('vae_model.pth'))
 vae.eval()
 for param in vae.parameters():
     param.requires_grad = False
+'''
 
 def state_func(configs):
     '''
@@ -28,7 +30,8 @@ def state_func(configs):
                         'max_iter': max_t,
                         'train_loss_history': training_loss_history,
                         'val_loss_history': val_loss_history,
-                        'use_vae': boolean
+                        'use_vae': boolean,
+                        'vae': vae
                     }
     '''
     num_classes = configs['num_classes']
@@ -40,6 +43,7 @@ def state_func(configs):
     train_loss_history = configs['train_loss_history']
     val_loss_history = configs['val_loss_history']
     use_vae = configs['use_vae']
+    vae = configs['vae']
 
     _inputs = {'inputs':inputs, 'labels':labels}
 
