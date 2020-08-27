@@ -12,20 +12,17 @@ def shiftLabelDistribution(images,labels,label_remove,percentage):
     # Output:   shifted_images (Pytorch Tensor) size=(batch,features,height,width)
     #           shifted_labels (Pytorch Tensor) size=(batch)
     
-    num_examples     = len(np.where(labels != label_remove)[0])+int(len(np.where(labels == label_remove)[0])*percentage)
-    shifted_images = torch.zeros([num_examples,1,28,28])
+    num_examples = len(np.where(labels!=label_remove)[0])+int(len(np.where(labels==label_remove)[0])*percentage)
+
+    shifted_images = torch.zeros([num_examples,3,32,32])
     shifted_labels = torch.zeros([num_examples])
 
-    image_ids        = np.where(labels != label_remove)
-    rand_id          = np.random.randint(len(image_ids[0]),size=[int(len(image_ids[0]))])
+    shifted_images[0:len(np.where(labels!=label_remove)[0]),:,:,:] = images[np.where(labels!=label_remove)[0],:,:,:]
+    shifted_labels[0:len(np.where(labels!=label_remove)[0])]       = labels[np.where(labels!=label_remove)[0]]
 
-    shifted_images[0:len(np.where(labels != label_remove)[0]),:,:,:] = images[image_ids[0][rand_id],:,:,:]
-    shifted_labels[0:len(np.where(labels != label_remove)[0])]       = labels[image_ids[0][rand_id]]
+    r = np.random.randint(len(np.where(labels==label_remove)[0]),size=int(len(np.where(labels==label_remove)[0])*percentage))
 
-    image_ids        = np.where(labels == label_remove)
-    rand_id          = np.random.randint(len(image_ids[0]),size=[int(len(image_ids[0])*percentage)])
-
-    shifted_images[len(np.where(labels != label_remove)[0]):,:,:,:] = images[image_ids[0][rand_id],:,:,:]
-    shifted_labels[len(np.where(labels != label_remove)[0]):]       = labels[image_ids[0][rand_id]]
+    shifted_images[len(np.where(labels!=label_remove)[0]):,:,:,:] = images[np.where(labels==label_remove)[0][r],:,:,:]
+    shifted_labels[len(np.where(labels!=label_remove)[0]):]       = labels[np.where(labels==label_remove)[0][r]]
 
     return shifted_images,shifted_labels
