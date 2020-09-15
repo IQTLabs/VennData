@@ -6,7 +6,9 @@ from argparse import RawTextHelpFormatter
 import torch
 
 from core.teacher_student import TeacherStudentModel
+from core.ac_teacher_student import ACTeacherStudentModel
 from core.helper_functions import state_func
+from core.vae import VAE
 
 from misc.logger import create_logger
 
@@ -47,10 +49,10 @@ def main(hparams, run=None, gpu_num=0):
     # models: teacher_configs/student_configs
     # optional: max_t, tau, threshold, M, max_non_increasing_steps, num_classes
     global logger
-    experiment_name = '_single_teacher'
+    experiment_name = 'AC_teacher'
     if run is not None:
         experiment_name += '_'+run
-    writer = SummaryWriter(comment=experiment_name)
+    writer = SummaryWriter(comment='_'+experiment_name)
     # ==================== building data loader ========================
     _teacher_train_loader_configs = hparams.dataloader['teacher_train']
     _student_train_loader_configs = hparams.dataloader['student_train']
@@ -67,8 +69,10 @@ def main(hparams, run=None, gpu_num=0):
     _student_configs = hparams.models['student_configs']
     _model_configs = {
         'student_configs': _student_configs,
-        'teacher_configs': _teacher_configs
+        'teacher_configs': _teacher_configs,
+        'model_savename': experiment_name
     }
+    policy = hparams.models['teacher_configs'].get('policy', 'reinforce')
     use_vae = hparams.models['teacher_configs'].get('use_vae', False)
     vae = None
     if use_vae:
@@ -77,11 +81,13 @@ def main(hparams, run=None, gpu_num=0):
         vae.eval()
         for param in vae.parameters():
             param.requires_grad = False
-    model = TeacherStudentModel(_model_configs)
+    if policy == 'reinforce':
+        model = TeacherStudentModel(_model_configs)
+    else:
+        model = ACTeacherStudentModel(_model_configs)
     model.train()
     model.cuda()
-    #for name, params in model.named_parameters():
-    #    print (name, params.size())
+
     # ================== set up lr scheduler=============================
     student_lr_scheduler = get_scheduler('student-cifar10')
     teacher_lr_scheduler = get_scheduler('teacher-cifar10')
@@ -158,7 +164,7 @@ if __name__ == '__main__':
     # models: teacher_configs/student_configs
     # optional: max_t, tau, threshold, M, max_non_increasing_steps, num_classes
     parser = argparse.ArgumentParser(description='Data selection using RL', formatter_class=RawTextHelpFormatter)
-    parser.add_argument('--hparams', default='cifar10_l2t', type=str, help='Choose hyper parameter configuration.\n[cifar10_l2t, multi_cifar10_l2t, cifar10_l2t_augment, cifar10_l2t_vae]')
+    parser.add_argument('--hparams', default='cifar10_l2t', type=str, help='Choose hyper parameter configuration.\n[cifar10_l2t, multi_cifar10_l2t, cifar10_l2t_augment, cifar10_l2t_vae, cifar10_ac]')
     parser.add_argument('--run', type=str, help='experiment name')
     parser.add_argument('--gpu', type=int, help='gpu number', default=0)
 

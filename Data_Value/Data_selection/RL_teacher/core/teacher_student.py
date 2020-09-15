@@ -252,6 +252,11 @@ class TeacherStudentModel(nn.Module):
                 # ++++ gradient similarity reward ++++++
 
                 # reformat train/dev gradients to be flat vector
+                # TODO TODO TODO
+                # fix this; getting stuck on 261
+                train_grads = gradient_samples_train
+                dev_grads = gradient_samples_dev
+                '''
                 train_grads = []
                 for g in gradient_samples_train:
                     flat_grad = torch.Tensor().cuda()
@@ -264,11 +269,15 @@ class TeacherStudentModel(nn.Module):
                     for layer in g:
                         flat_grad = torch.cat((flat_grad, layer.view(-1)))
                     dev_grads.append(flat_grad)
+                '''
 
                 # flatten actions
+                flat_actions = torch.cat(batch_actions)
+                '''
                 flat_actions = torch.Tensor().cuda()
                 for a in batch_actions:
                     flat_actions = torch.cat((flat_actions,a))
+                '''
                 assert len(flat_actions) == len(train_grads)
 
                 # calculate loss for teacher from dense reward
@@ -432,6 +441,7 @@ class TeacherStudentModel(nn.Module):
         student_optimizer = configs['optimizer']['student']
         student_lr_scheduler = configs['lr_scheduler']['student']
         logger = configs['logger']
+        vae = configs['vae']
 
         # ================== init tracking history ====================
         training_loss_history = []
