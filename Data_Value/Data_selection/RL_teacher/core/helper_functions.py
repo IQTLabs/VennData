@@ -95,6 +95,11 @@ def evaluator(predicts, labels):
 
     num_correct = num_correct.data.numpy()
     num_samples = float(predicts.size(0))
+    #print('predicts shape = {}, labels shape = {}'.format(predicts.shape, labels.shape))
+    if labels.dim() == 0:
+        labels = labels.unsqueeze(0)
+    if predicts.dim() == 0:
+        predicts = predicts.unsqueeze(0)
     loss = criterion(predicts, labels)
     full_crit = nn.CrossEntropyLoss(reduction='none')
     full_loss = full_crit(predicts, labels)
