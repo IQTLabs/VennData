@@ -75,14 +75,14 @@ class StudentNetwork(nn.Module):
                 for l in full_loss:
                     #print('len gradient samples = ', len(gradient_samples))
                     gradients = torch.autograd.grad(l, (self.base_model.parameters()), create_graph=False, retain_graph=True)
-                    gradient_samples.append([g.detach() for g in gradients])
+                    gradient_samples.append(torch.cat([g.detach().view(-1) for g in gradients]))
             loss.backward()
             optimizer.step()
             #print('batch accuracy = ',num_correct/num_samples)
             #logger.info('Policy Steps: [%d] Train: ----- Iteration [%d], loss: %5.4f, accuracy: %5.4f(%5.4f)' % (
             #    teacher_updates, current_epoch+1, loss.cpu().item(), num_correct/num_samples, all_correct/all_samples))
-            logger.info('Policy Steps: [%d] Train: ----- Iteration [%d], loss: %5.4f, minibatch-accuracy: %5.4f' % (
-                teacher_updates, current_epoch+1, loss.cpu().item(), num_correct/num_samples))
+            logger.info('Policy: [%d] Train: -- Iter [%d], loss: %5.4f, minibatch-accuracy: %5.4f (%d batch size)' % (
+                teacher_updates, current_epoch+1, loss.cpu().item(), num_correct/num_samples, num_samples))
             loss_average += loss.cpu().item()
         if return_gradients:
             return loss_average/total_steps, gradient_samples
@@ -121,7 +121,7 @@ class StudentNetwork(nn.Module):
             #print('dev inputs shape = ',inputs.shape)
             if return_gradients:
                 gradients = torch.autograd.grad(loss, (self.base_model.parameters()), create_graph=False, retain_graph=False)
-                gradient_samples.append([g.detach() for g in gradients])
+                gradient_samples.append(torch.cat([g.detach().view(-1) for g in gradients]))
             #for x in self.base_model.parameters():
             #    if x.grad is not None:
             #        x.grad.data.zero_()

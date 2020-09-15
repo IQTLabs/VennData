@@ -6,7 +6,9 @@ from argparse import RawTextHelpFormatter
 import torch
 
 from core.teacher_student import TeacherStudentModel
+from core.ac_teacher_student import ACTeacherStudentModel
 from core.helper_functions import state_func
+from core.vae import VAE
 
 from misc.logger import create_logger
 
@@ -34,8 +36,10 @@ def make_global_parameters(hparams):
     # saver = Saver(saver_configs['init_best_metric'], saver_configs['metric_name'], hparams, saver_configs['output_path'])
 
 
-def main(hparams, run=None):
-    torch.cuda.set_device(0)
+def main(hparams, run=None, gpu_num=0):
+
+    device = torch.device('cuda:{}'.format(gpu_num) if torch.cuda.is_available() else 'cpu')
+    torch.cuda.set_device(gpu_num)
     # teacher train set 45%
     # teacher dev set 5%
     # student train set 50%
@@ -45,10 +49,10 @@ def main(hparams, run=None):
     # models: teacher_configs/student_configs
     # optional: max_t, tau, threshold, M, max_non_increasing_steps, num_classes
     global logger
-    experiment_name = '_single_teacher'
+    experiment_name = 'AC_teacher'
     if run is not None:
         experiment_name += '_'+run
-    writer = SummaryWriter(comment=experiment_name)
+    writer = SummaryWriter(comment='_'+experiment_name)
     # ==================== building data loader ========================
     _teacher_train_loader_configs = hparams.dataloader['teacher_train']
     _student_train_loader_configs = hparams.dataloader['student_train']
@@ -65,13 +69,25 @@ def main(hparams, run=None):
     _student_configs = hparams.models['student_configs']
     _model_configs = {
         'student_configs': _student_configs,
-        'teacher_configs': _teacher_configs
+        'teacher_configs': _teacher_configs,
+        'model_savename': experiment_name
     }
-    model = TeacherStudentModel(_model_configs)
+    policy = hparams.models['teacher_configs'].get('policy', 'reinforce')
+    use_vae = hparams.models['teacher_configs'].get('use_vae', False)
+    vae = None
+    if use_vae:
+        vae = VAE(device=device).to(device)
+        vae.load_state_dict(torch.load('vae_model.pth'))
+        vae.eval()
+        for param in vae.parameters():
+            param.requires_grad = False
+    if policy == 'reinforce':
+        model = TeacherStudentModel(_model_configs)
+    else:
+        model = ACTeacherStudentModel(_model_configs)
     model.train()
     model.cuda()
-    #for name, params in model.named_parameters():
-    #    print (name, params.size())
+
     # ================== set up lr scheduler=============================
     student_lr_scheduler = get_scheduler('student-cifar10')
     teacher_lr_scheduler = get_scheduler('teacher-cifar10')
@@ -121,7 +137,9 @@ def main(hparams, run=None):
         'threshold': threshold,
         'M': M,
         'max_non_increasing_steps': max_non_increasing_steps,
-        'num_classes': num_classes
+        'num_classes': num_classes,
+        'use_vae': use_vae,
+        'vae': vae
     }
     print ('Fitting the teacher starts.............')
     model.fit_teacher(fit_configs)
@@ -146,14 +164,16 @@ if __name__ == '__main__':
     # models: teacher_configs/student_configs
     # optional: max_t, tau, threshold, M, max_non_increasing_steps, num_classes
     parser = argparse.ArgumentParser(description='Data selection using RL', formatter_class=RawTextHelpFormatter)
-    parser.add_argument('--hparams', default='cifar10_l2t', type=str, help='Choose hyper parameter configuration.\n[cifar10_l2t, multi_cifar10_l2t, cifar10_l2t_augment, cifar10_l2t_vae]')
+    parser.add_argument('--hparams', default='cifar10_l2t', type=str, help='Choose hyper parameter configuration.\n[cifar10_l2t, multi_cifar10_l2t, cifar10_l2t_augment, cifar10_l2t_vae, cifar10_ac]')
     parser.add_argument('--run', type=str, help='experiment name')
+    parser.add_argument('--gpu', type=int, help='gpu number', default=0)
 
     args = parser.parse_args()
     extra_info = None
     hparams = get_hparams(args.hparams)(extra_info)
 
     make_global_parameters(hparams)
+
     #print(hparams._items)
-    main(hparams, args.run)
+    main(hparams, args.run, args.gpu)
 

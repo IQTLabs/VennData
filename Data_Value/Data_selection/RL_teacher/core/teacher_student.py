@@ -35,6 +35,7 @@ class TeacherStudentModel(nn.Module):
         init_params(self.student_net)
 
         self.is_vae_teacher = self.configs['teacher_configs'].get('use_vae', False)
+        #self.is_vae_teacher = self.configs['use_vae']
         if self.is_vae_teacher:
             self.teacher_net = TeacherNetworkExtended(configs['teacher_configs'])
         else:
@@ -102,6 +103,7 @@ class TeacherStudentModel(nn.Module):
         student_lr_scheduler = configs['lr_scheduler']['student']
         logger = configs['logger']
         writer = configs['writer']
+        vae = configs['vae']
 
         # ================== init tracking history ====================
         rewards = []
@@ -152,7 +154,8 @@ class TeacherStudentModel(nn.Module):
                             'max_iter': max_t,
                             'train_loss_history': training_loss_history,
                             'val_loss_history': val_loss_history,
-                            'use_vae': self.is_vae_teacher
+                            'use_vae': self.is_vae_teacher,
+                            'vae': vae
                         }
                         states, vae_z = state_func(state_configs)
                         _inputs = {'input': states.detach(), 'vae_z': vae_z}
@@ -249,6 +252,11 @@ class TeacherStudentModel(nn.Module):
                 # ++++ gradient similarity reward ++++++
 
                 # reformat train/dev gradients to be flat vector
+                # TODO TODO TODO
+                # fix this; getting stuck on 261
+                train_grads = gradient_samples_train
+                dev_grads = gradient_samples_dev
+                '''
                 train_grads = []
                 for g in gradient_samples_train:
                     flat_grad = torch.Tensor().cuda()
@@ -261,11 +269,15 @@ class TeacherStudentModel(nn.Module):
                     for layer in g:
                         flat_grad = torch.cat((flat_grad, layer.view(-1)))
                     dev_grads.append(flat_grad)
+                '''
 
                 # flatten actions
+                flat_actions = torch.cat(batch_actions)
+                '''
                 flat_actions = torch.Tensor().cuda()
                 for a in batch_actions:
                     flat_actions = torch.cat((flat_actions,a))
+                '''
                 assert len(flat_actions) == len(train_grads)
 
                 # calculate loss for teacher from dense reward
@@ -429,6 +441,7 @@ class TeacherStudentModel(nn.Module):
         student_optimizer = configs['optimizer']['student']
         student_lr_scheduler = configs['lr_scheduler']['student']
         logger = configs['logger']
+        vae = configs['vae']
 
         # ================== init tracking history ====================
         training_loss_history = []
@@ -462,7 +475,8 @@ class TeacherStudentModel(nn.Module):
                     'max_iter': max_t,
                     'train_loss_history': training_loss_history,
                     'val_loss_history': val_loss_history,
-                    'use_vae': self.is_vae_teacher
+                    'use_vae': self.is_vae_teacher,
+                    'vae': vae
                 }
                 states, vae_z = state_func(state_configs)  # TODO: implement the function for computing state
                 _inputs = {'input': states, 'vae_z':vae_z}
