@@ -70,7 +70,8 @@ def main(hparams, run=None, gpu_num=0):
     _model_configs = {
         'student_configs': _student_configs,
         'teacher_configs': _teacher_configs,
-        'model_savename': experiment_name
+        'model_savename': experiment_name,
+        'device': device
     }
     policy = hparams.models['teacher_configs'].get('policy', 'reinforce')
     use_vae = hparams.models['teacher_configs'].get('use_vae', False)

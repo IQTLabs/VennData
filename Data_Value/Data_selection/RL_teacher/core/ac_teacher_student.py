@@ -39,7 +39,7 @@ class ACTeacherStudentModel(nn.Module):
         super(ACTeacherStudentModel, self).__init__()
         self.configs = configs
         self.model_savename = configs['model_savename']
-
+        self.device = configs['device']
         self.student_net = StudentNetwork(configs['student_configs'])
         init_params(self.student_net)
 
@@ -399,7 +399,7 @@ class ACTeacherStudentModel(nn.Module):
                     if load_checkpoint:
                         # TODO: need to update torch.load filepath to include _teacher_updates number
                         # TODO: need to search for greatest teacher_nupdates checkpoint for the given model_savename
-                        checkpoint = torch.load(os.path.join('./checkpoints/', self.model_savename+'.pth.tar'))
+                        checkpoint = torch.load(os.path.join('./checkpoints/', self.model_savename+'.pth.tar'), map_location=self.device)
                         i_tau = checkpoint['i_tau']
                         i_teacher = checkpoint['i_teacher']
                         teacher_updates = checkpoint['teacher_updates']
