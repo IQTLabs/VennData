@@ -47,6 +47,7 @@ def state_func(configs):
 
     _inputs = {'inputs':inputs, 'labels':labels}
 
+    print(_inputs['inputs'].shape)
     predicts, _ = student(_inputs, None) # predicts are logits
 
     # VAE

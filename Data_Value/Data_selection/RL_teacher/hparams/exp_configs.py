@@ -1,6 +1,6 @@
 from .hparams import HParams
 from .register import register
-from core.models.resnet import ResNet34, ResNet18
+from core.models.resnet import ResNet34, ResNet18, ResNet50
 from core.helper_functions import evaluator
 import torchvision.transforms as transforms
 import pickle
@@ -21,11 +21,12 @@ def cifar10_ac(extra_info):
         'policy': 'actor_critic'
     }
     student_configs = {
-        'base_model': ResNet18(num_classes=2),
+        'base_model': ResNet18(num_classes=2, linear_in=814592),
         'evaluator': evaluator
     }
     transform_train = transforms.Compose([
         #transforms.RandomCrop(32, padding=4),
+        transforms.RandomCrop((1200,1400)),
         #transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
@@ -43,7 +44,7 @@ def cifar10_ac(extra_info):
                 'split': splits[0],
                 'root': root,
                 'transform': transform_train,
-                'batch_size': 2,
+                'batch_size': 1,
                 'shuffle': True
             },
         'student_train':
@@ -52,7 +53,7 @@ def cifar10_ac(extra_info):
                 'split': splits[1],
                 'root': root,
                 'transform': transform_train,
-                'batch_size': 2,
+                'batch_size': 1,
                 'shuffle': True
             },
         'dev':
@@ -61,7 +62,7 @@ def cifar10_ac(extra_info):
                 'split': splits[2],
                 'root': root,
                 'transform': transform_test,
-                'batch_size': 200, #1250,
+                'batch_size': 1, #1250,
                 'shuffle': False
             },
         'test':
@@ -70,7 +71,7 @@ def cifar10_ac(extra_info):
                 'split': splits[3],
                 'root': root,
                 'transform': transform_test,
-                'batch_size': 200, #1250,
+                'batch_size': 1, #1250,
                 'shuffle': False
             }
     }
