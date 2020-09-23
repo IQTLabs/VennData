@@ -10,6 +10,7 @@ from functools import partial
 import pickle
 
 import torch.utils.data as data
+import torchvision
 from misc.utils import to_var
 
 
@@ -61,11 +62,11 @@ class Cifar10Dataloader(data.Dataset):
         inputs = torch.cat([x.view(1, 3, 32, 32) for x in inputs], 0)
         return inputs, labels
 
+def get_dataloader(configs, seed=None):
+    batch_size = configs['batch_size']
+    shuffle = configs['shuffle']
 
-def get_dataloader(configs):
     if configs['dataset'] == 'cifar10' or (configs['dataset'] ==  'multi_cifar10' and configs['split'] != 'dev'):
-        batch_size = configs['batch_size']
-        shuffle = configs['shuffle']
         dataset = Cifar10Dataloader(configs)
         data_loader = torch.utils.data.DataLoader(dataset=dataset,
                                                   batch_size=batch_size,
@@ -75,8 +76,6 @@ def get_dataloader(configs):
         return data_loader
 
     elif configs['dataset'] == 'multi_cifar10' and configs['split'] == 'dev':
-        batch_size = configs['batch_size']
-        shuffle = configs['shuffle']
         multi_dataloaders = {}
         for i in range(10):
             configs['label'] = i
@@ -88,6 +87,32 @@ def get_dataloader(configs):
                                                       collate_fn=dataset.collate_fn)
             multi_dataloaders[i] = data_loader
         return multi_dataloaders
+
+    elif configs['dataset'] == 'bionic_regroup':
+        dataset = torchvision.datasets.ImageFolder(os.path.join(configs['root'], 'data','lab41_bio','bionic_regroup'), transform=configs['transform'])
+
+        teacher_split = int(0.4 * len(dataset))
+        student_split = int(0.4 * len(dataset))
+        dev_split = int(0.10 * len(dataset))
+        test_split = int(0.10 * len(dataset))
+        np.random.seed(seed)
+        indices = np.random.permutation(len(dataset))
+        splits = {
+                    'teacher_train': indices[:teacher_split],
+                    'student_train': indices[teacher_split:teacher_split+student_split],
+                    'dev': indices[teacher_split+student_split:teacher_split+student_split+dev_split],
+                    'test': indices[teacher_split+student_split+dev_split:]
+                }
+        dataset_split = torch.utils.data.Subset(dataset, splits[configs['split']])
+
+        data_loader = torch.utils.data.DataLoader(dataset=dataset_split,
+                                                  batch_size = batch_size,
+                                                  shuffle = shuffle,
+                                                  num_workers = 0,
+                                                  )
+        return data_loader
+
     else:
         raise NotImplementedError
+
 
