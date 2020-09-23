@@ -16,7 +16,7 @@ import random
 import os
 
 from core.student_network import StudentNetwork
-from core.teacher_network import ACTeacherNetworkExtended
+from core.teacher_network import ACTeacherNetwork
 
 from misc.utils import init_params, to_var
 
@@ -43,13 +43,16 @@ class ACTeacherStudentModel(nn.Module):
         self.student_net = StudentNetwork(configs['student_configs'])
         init_params(self.student_net)
 
+
         self.is_vae_teacher = self.configs['teacher_configs'].get('use_vae', False)
-        #self.is_vae_teacher = self.configs['use_vae']
+        self.teacher_net = ACTeacherNetwork(configs['teacher_configs'])
+        '''
         if self.is_vae_teacher:
             self.teacher_net = ACTeacherNetworkExtended(configs['teacher_configs'])
         else:
             raise Exception("Error: ActorCritic teacher only implemented with VAE extension. Set use_vae=True in hparams.")
             #self.teacher_net = TeacherNetwork(configs['teacher_configs'])
+        '''
         self.is_augment_teacher = self.teacher_net.output_dim > 1
 
     def calculateACLoss(self, rewards_in, logprobs, state_values, gamma=0.99):
