@@ -63,6 +63,8 @@ class ACTeacherStudentModel(nn.Module):
 
         # normalizing the rewards:
         rewards = torch.tensor(rewards).cuda()
+        rewards_avg = rewards.mean().item()
+        rewards_std = rewards.std().item()
         rewards = (rewards - rewards.mean()) / (rewards.std())
 
         #loss = 0
@@ -75,7 +77,7 @@ class ACTeacherStudentModel(nn.Module):
             action_loss_sum += action_loss
             value_loss_sum += value_loss
             #loss += (action_loss + value_loss)
-        return action_loss_sum, value_loss_sum
+        return action_loss_sum, value_loss_sum, rewards_avg, rewards_std
 
     def fit_teacher(self, configs):
         '''
@@ -345,10 +347,12 @@ class ACTeacherStudentModel(nn.Module):
                         # policy gradient loss
                         grad_loss -= flat_actions[jj] * grad_reward.detach()
                     '''
-                    action_loss, value_loss = self.calculateACLoss(grad_sim_rewards, flat_actions, flat_values)
+                    action_loss, value_loss, rewards_avg, rewards_std = self.calculateACLoss(grad_sim_rewards, flat_actions, flat_values)
 
                     writer.add_scalar('action_loss', action_loss, i_teacher)
                     writer.add_scalar('value_loss', value_loss, i_teacher)
+                    writer.add_scalar('rewards_avg', rewards_avg, i_teacher)
+                    writer.add_scalar('rewards_std', rewards_std, i_teacher)
 
                     grad_sim_ACLoss = action_loss + value_loss
 

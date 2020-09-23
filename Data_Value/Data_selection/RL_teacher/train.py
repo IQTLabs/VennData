@@ -59,10 +59,10 @@ def main(hparams, run=None, gpu_num=0):
     _dev_loader_configs = hparams.dataloader['dev']
     _test_loader_configs = hparams.dataloader['test']
 
-    teacher_train_loader = get_dataloader(_teacher_train_loader_configs)
-    student_train_loader = get_dataloader(_student_train_loader_configs)
-    dev_loader = get_dataloader(_dev_loader_configs)
-    test_loader = get_dataloader(_test_loader_configs)
+    teacher_train_loader = get_dataloader(_teacher_train_loader_configs, hparams.seed)
+    student_train_loader = get_dataloader(_student_train_loader_configs, hparams.seed)
+    dev_loader = get_dataloader(_dev_loader_configs, hparams.seed)
+    test_loader = get_dataloader(_test_loader_configs, hparams.seed)
 
     # =================== building model ==============================
     _teacher_configs = hparams.models['teacher_configs']
