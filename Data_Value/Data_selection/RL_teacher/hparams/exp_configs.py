@@ -9,7 +9,7 @@ import pickle
 seed = 666
 
 @register("bionic_ac")
-def cifar10_ac(extra_info):
+def bionic_ac(extra_info):
     global seed
     root = './'
     dataset = 'bionic_regroup'
