@@ -17,7 +17,7 @@ def bionic_ac(extra_info):
     teacher_configs = {
         'input_dim': 25,
         'output_dim': 1,
-        'use_vae': True,
+        'use_vae': False,
         'policy': 'actor_critic'
     }
     student_configs = {

@@ -76,17 +76,18 @@ def state_func(configs):
     model_features[:, 2] = min(1.0, 1.0 if len(val_loss_history) == 0 else min(val_loss_history)/2.3)
     # sigmoid(min(val_loss_history))
 
-    combined_features = to_var(torch.zeros(n_samples, 12))
-    combined_features[:, :10] = predicts
+    combined_features = to_var(torch.zeros(n_samples, num_classes+2))
+    print(combined_features.shape)
+    combined_features[:, :num_classes] = predicts
 
     eps = 1e-6
-    combined_features[:, 10:11] = -torch.log(predicts[range(n_samples), labels.data] + eps).reshape(-1, 1)
+    combined_features[:, num_classes:num_classes+1] = -torch.log(predicts[range(n_samples), labels.data] + eps).reshape(-1, 1)
 
     mask = to_var(torch.ones(n_samples, num_classes))
 
     mask[range(n_samples), labels.data] = 0
     preds = predicts[range(n_samples), labels.data] - torch.max(mask*predicts, 1)[0]
-    combined_features[:, 11:12] = preds.reshape(-1, 1)
+    combined_features[:, num_classes+1:num_classes+2] = preds.reshape(-1, 1)
 
     states = torch.cat([data_features, model_features, combined_features], 1)
     return states, vae_z
