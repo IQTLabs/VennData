@@ -1,6 +1,28 @@
 import torch
 import torch.nn as nn
 
+
+class ACNoTeach(nn.Module):
+
+    def __init__(self, configs):
+        super(ACNoTeach, self).__init__()
+        self.input_dim = configs.get('input_dim', 25)
+        self.output_dim = configs.get('output_dim', 1)
+
+    def init_weights(self):
+        pass
+
+    def forward(self, state_data, configs=None):
+        '''
+        :param data: tensor, [batch_size, input_dim]
+        :param configs:
+        :return:
+        '''
+        x = state_data['input']
+        action = torch.ones((len(x),1))
+        value = None
+        return action, value
+
 class ACTeacherNetwork(nn.Module):
 
     def __init__(self, configs):

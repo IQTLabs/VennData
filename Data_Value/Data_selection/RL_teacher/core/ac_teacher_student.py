@@ -17,7 +17,7 @@ import os
 import time
 
 from core.student_network import StudentNetwork
-from core.teacher_network import ACTeacherNetwork
+from core.teacher_network import ACTeacherNetwork, ACNoTeach
 
 from misc.utils import init_params, to_var
 
@@ -38,7 +38,7 @@ def save_checkpoint(state, save_path, filename, is_best=False, timestamp=''):
 
 class ACTeacherStudentModel(nn.Module):
 
-    def __init__(self, configs):
+    def __init__(self, configs, noteach=False):
         super(ACTeacherStudentModel, self).__init__()
         self.configs = configs
         self.model_savename = configs['model_savename']
@@ -48,7 +48,10 @@ class ACTeacherStudentModel(nn.Module):
 
 
         self.is_vae_teacher = self.configs['teacher_configs'].get('use_vae', False)
-        self.teacher_net = ACTeacherNetwork(configs['teacher_configs'])
+        if noteach:
+            self.teacher_net = ACNoTeach(configs['teacher_configs'])
+        else:
+            self.teacher_net = ACTeacherNetwork(configs['teacher_configs'])
         '''
         if self.is_vae_teacher:
             self.teacher_net = ACTeacherNetworkExtended(configs['teacher_configs'])
@@ -57,6 +60,14 @@ class ACTeacherStudentModel(nn.Module):
             #self.teacher_net = TeacherNetwork(configs['teacher_configs'])
         '''
         self.is_augment_teacher = self.teacher_net.output_dim > 1
+
+    def load_teacher_checkpoint(self, checkpoint_filename):
+
+        if checkpoint_filename is None or checkpoint_filename == '' or not os.path.isfile(checkpoint_filename):
+            checkpoint_filename = os.path.join('./checkpoints/', self.model_savename+'.pth.tar')
+        checkpoint = torch.load(checkpoint_filename, map_location=self.device)
+        self.teacher_net.load_state_dict(checkpoint['teacher_state_dict'])
+        return checkpoint_filename
 
     def calculateACLoss(self, rewards_in, logprobs, state_values, gamma=0.99):
 
@@ -565,6 +576,9 @@ class ACTeacherStudentModel(nn.Module):
         logger = configs['logger']
         writer = configs['writer']
         vae = configs['vae']
+        mislabel = configs['mislabel']
+        mislabel_rate = configs['mislabel_rate']
+
 
         # ================== init tracking history ====================
         training_loss_history = []
@@ -580,6 +594,10 @@ class ACTeacherStudentModel(nn.Module):
         student_iter = 0
 
         action_counts = np.array([])
+
+        count_mislabeled = 0
+        count_mislabeled_filtered = 0
+
         while i_tau < max_t:
             i_tau += 1
             count = 0
@@ -589,6 +607,9 @@ class ACTeacherStudentModel(nn.Module):
             for idx, (inputs, labels) in enumerate(student_dataloader):
                 inputs = to_var(inputs).to(self.device)
                 labels = to_var(labels).to(self.device)
+                if mislabel:
+                    mislabel_idx = np.random.rand(2) < mislabel_rate
+                    labels[mislabel_idx] = torch.tensor(np.random.randint(10, size=np.sum(mislabel_idx))).to(self.device)
                 state_configs = {
                     'num_classes': num_classes,
                     'labels': labels,
@@ -606,6 +627,10 @@ class ACTeacherStudentModel(nn.Module):
                 _inputs = {'input': states, 'vae_z':vae_z}
                 predicts, value = teacher(_inputs, None)
 
+                mislabel_filtered = [a==b and a==True for a,b in zip((predicts.cpu().numpy().squeeze()<threshold), mislabel_idx)]
+                count_mislabeled += np.sum(mislabel_idx)
+                count_mislabeled_filtered += np.sum(mislabel_filtered)
+                # predicts: 1 to use , 0 to filter out
                 if self.is_augment_teacher: # data augment teacher
                     teacher_actions = torch.argmax(predicts, dim=1) # n values (in the range of 0:action_space)
                     action_counts = np.append(action_counts, teacher_actions.detach().cpu().numpy())
@@ -704,4 +729,7 @@ class ACTeacherStudentModel(nn.Module):
                 #logger.info('Testing Set: Iteration [%d], accuracy: %5.4f, best: %5.4f' % (student_updates, acc, best_acc_on_test))
                 logger.info('Testing on Test: accuracy: %5.4f, best: %5.4f' % (acc, best_acc_on_test))
                 effnum_acc_curves.append((effective_num, acc))
+
+                writer.add_scalar('percent_filtered_from_mislabeled', count_mislabeled_filtered/count_mislabeled, i_tau)
+
         return effnum_acc_curves

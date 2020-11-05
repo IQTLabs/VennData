@@ -30,6 +30,7 @@ class Cifar10Dataloader(data.Dataset):
         labels = []
         data = []
         # data_dict is [10 x (label, data_list=(3072=3*32*32))]
+        # data_dict: dictionary with 10 keys, each item is a list of images
         for label, data_list in data_dict.items():
             if 'label' in configs and configs['label'] != label:
                 continue # skip if config['label'] does not match; used when doing label based dataloader for multi teacher
