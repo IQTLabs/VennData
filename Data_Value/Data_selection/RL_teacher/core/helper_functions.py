@@ -47,7 +47,7 @@ def state_func(configs):
 
     _inputs = {'inputs':inputs, 'labels':labels}
 
-    print(_inputs['inputs'].shape)
+    #print(_inputs['inputs'].shape)
     predicts, _ = student(_inputs, None) # predicts are logits
 
     # VAE
@@ -77,7 +77,7 @@ def state_func(configs):
     # sigmoid(min(val_loss_history))
 
     combined_features = to_var(torch.zeros(n_samples, num_classes+2))
-    print(combined_features.shape)
+    #print(combined_features.shape)
     combined_features[:, :num_classes] = predicts
 
     eps = 1e-6
