@@ -14,11 +14,14 @@ import torchvision
 import torchvision.transforms.functional as TF
 import random
 import os
+import time
 
 from core.student_network import StudentNetwork
 from core.teacher_network import ACTeacherNetwork
 
 from misc.utils import init_params, to_var
+
+from pytorch_memlab import MemReporter
 
 # ================== helper function ===============
 def to_generator(data):
@@ -40,7 +43,7 @@ class ACTeacherStudentModel(nn.Module):
         self.configs = configs
         self.model_savename = configs['model_savename']
         self.device = configs['device']
-        self.student_net = StudentNetwork(configs['student_configs'])
+        self.student_net = StudentNetwork(configs['student_configs'], device=self.device)
         init_params(self.student_net)
 
 
@@ -65,7 +68,8 @@ class ACTeacherStudentModel(nn.Module):
             rewards.insert(0, dis_reward)
 
         # normalizing the rewards:
-        rewards = torch.tensor(rewards).cuda()
+        #rewards = torch.tensor(rewards).cuda()
+        rewards = torch.tensor(rewards).to(self.device)
         rewards_avg = rewards.mean().item()
         rewards_std = rewards.std().item()
         rewards = (rewards - rewards.mean()) / (rewards.std())
@@ -128,7 +132,7 @@ class ACTeacherStudentModel(nn.Module):
         # ==================== fetch configs [optional] ===============
         max_t = configs['max_t']
         tau = configs['tau']
-        M = configs['M']
+        selection_batch_size = configs['selection_batch_size']
         max_non_increasing_steps = configs['max_non_increasing_steps']
         num_classes = configs['num_classes']
 
@@ -188,8 +192,8 @@ class ACTeacherStudentModel(nn.Module):
                     # ================== collect training batch ============
                     while True:
                         for idx, (inputs, labels) in enumerate(teacher_dataloader):
-                            inputs = to_var(inputs)
-                            labels = to_var(labels)
+                            inputs = to_var(inputs).to(self.device)
+                            labels = to_var(labels).to(self.device)
                             state_configs = {
                                 'num_classes': num_classes,
                                 'labels': labels,
@@ -200,7 +204,8 @@ class ACTeacherStudentModel(nn.Module):
                                 'train_loss_history': training_loss_history,
                                 'val_loss_history': val_loss_history,
                                 'use_vae': self.is_vae_teacher,
-                                'vae': vae
+                                'vae': vae,
+                                'device': self.device
                             }
                             states, vae_z = state_func(state_configs)
                             _inputs = {'input': states.detach(), 'vae_z': vae_z}
@@ -213,8 +218,13 @@ class ACTeacherStudentModel(nn.Module):
                                 # (0=>no select,1=>select w/ no aug, 2=>, horizontal flip, 3=> adjust brightness, 4=> adjust contrast)
                                 action_log_probs = m.log_prob(sampled_actions)
                             else:
+                                #print('action_probs: ',action_probs)
                                 sampled_actions = torch.bernoulli(action_probs.data.squeeze())
-                            indices = torch.nonzero(sampled_actions)
+                                #print('sampled actions = ',sampled_actions)
+                            if sampled_actions.ndim == 0:
+                                sampled_actions = torch.unsqueeze(sampled_actions,0)
+                            #print(sampled_actions)
+                            indices = torch.nonzero(sampled_actions, as_tuple=False)
 
                             if len(indices) == 0:
                                 continue
@@ -240,7 +250,8 @@ class ACTeacherStudentModel(nn.Module):
                                         temp_img = TF.adjust_brightness(temp_img, random.random()+0.5)
                                     elif action == 4:
                                         temp_img = TF.adjust_contrast(temp_img, random.random()+0.5)
-                                    selected_inputs[i] = to_tensor(temp_img).cuda()
+                                    #selected_inputs[i] = to_tensor(temp_img).cuda()
+                                    selected_inputs[i] = to_tensor(temp_img).to(self.device)
                                 #inputs[indices.squeeze()] # the inputs to be augmented
                                 #sampled_actions[indices] # the sampled augmentations
                                 # (0=>no select,1=>select w/ no aug, 2=>, horizontal flip, 3=> adjust brightness, 4=> adjust contrast)
@@ -254,14 +265,14 @@ class ACTeacherStudentModel(nn.Module):
                                 actions.append(action_log_probs)
                                 episode_actions.append(action_log_probs[indices].view(-1))
                             else:
-                                actions.append(torch.log(action_probs.squeeze())*to_var(sampled_actions-0.5)*2)
-                                episode_actions.append(torch.log(action_probs.squeeze()[indices]))
+                                actions.append(torch.log(action_probs.squeeze())*to_var(sampled_actions-0.5).to(self.device)*2)
+                                episode_actions.append(torch.log(action_probs.squeeze(dim=0)[indices]))
                                 values.append(value.squeeze())
-                                episode_values.append(value.squeeze()[indices])
-                            if count >= M: # teachers have selected M samples; mini batch completed
+                                episode_values.append(value.squeeze(dim=0)[indices])
+                            if count >= selection_batch_size: # teachers have selected M samples; mini batch completed
                                 effective_train_data += count
                                 break
-                        if count >= M:
+                        if count >= selection_batch_size:
                             break
 
                     # ================== prepare training data =============
@@ -286,12 +297,27 @@ class ACTeacherStudentModel(nn.Module):
                         'policy_step': teacher_updates
                     }
                     # ================= feed the selected batch ============
+                    '''
+                    reporter_teacher = MemReporter(teacher)
+                    reporter_teacher.report()
+                    reporter_student = MemReporter(student)
+                    reporter_student.report()
+                    reporter = MemReporter()
+                    reporter.report()
+                    '''
+
                     train_loss, gradient_samples_train = student.fit(st_configs)
                     training_loss_history.append(train_loss)
                     student_updates += 1
                     student_lr_scheduler(student_optimizer, student_updates)
                     # ================ test on dev set =====================
                     st_configs['dataloader'] = dev_dataloader
+                    '''
+                    while True:
+                        time.sleep(10)
+                        print('waiting')
+                    '''
+
                     acc, val_loss, gradient_samples_dev = student.val(st_configs)
                     best_acc_on_dev = acc if best_acc_on_dev < acc else best_acc_on_dev
                     #logger.info('Stage [%d], Policy Steps: [%d] Test on Dev: Iteration [%d], accuracy: %5.4f, best: %5.4f, '
@@ -373,7 +399,8 @@ class ACTeacherStudentModel(nn.Module):
                     del dev_grads
                     del gradient_samples_dev
                     del gradient_samples_train
-                    torch.cuda.empty_cache()
+                    if 'cuda' in str(self.device):
+                        torch.cuda.empty_cache()
                     ##########################################
                     #########################################
                     # ============== check if reach the expected accuracy or exceeds the max_t ==================
@@ -525,7 +552,7 @@ class ACTeacherStudentModel(nn.Module):
         student = self.student_net
         # ==================== fetch configs [optional] ===============
         threshold = configs.get('threshold', 0.5)
-        M = configs.get('M', 128)
+        selection_batch_size = configs.get('selection_batch_size', 128)
         num_classes = configs.get('num_classes', 10)
         max_t = configs.get('max_t', 50000)
         # =================== fetch configs [required] ================
@@ -560,8 +587,8 @@ class ACTeacherStudentModel(nn.Module):
             label_pool = []
             # ================== collect training batch ============
             for idx, (inputs, labels) in enumerate(student_dataloader):
-                inputs = to_var(inputs)
-                labels = to_var(labels)
+                inputs = to_var(inputs).to(self.device)
+                labels = to_var(labels).to(self.device)
                 state_configs = {
                     'num_classes': num_classes,
                     'labels': labels,
@@ -572,7 +599,8 @@ class ACTeacherStudentModel(nn.Module):
                     'train_loss_history': training_loss_history,
                     'val_loss_history': val_loss_history,
                     'use_vae': self.is_vae_teacher,
-                    'vae': vae
+                    'vae': vae,
+                    'device': self.device
                 }
                 states, vae_z = state_func(state_configs)  # TODO: implement the function for computing state
                 _inputs = {'input': states, 'vae_z':vae_z}
@@ -585,9 +613,9 @@ class ACTeacherStudentModel(nn.Module):
                     # action_log_probs = m.log_prob(sampled_actions)
                     indices = torch.nonzero(teacher_actions)
                 else:
-                    indices = torch.nonzero(predicts.data.squeeze() >= threshold)
+                    indices = torch.nonzero(predicts.data.squeeze() >= threshold, as_tuple=False)
 
-                if len(indices) == 0:
+                if len(indices) == 0 or indices.nelement() == 0:
                     continue
                 count += len(indices)
                 # selected_inputs = torch.gather(inputs, 0, indices.squeeze()).view(len(indices),
@@ -610,7 +638,8 @@ class ACTeacherStudentModel(nn.Module):
                             temp_img = TF.adjust_brightness(temp_img, random.random()*2)
                         elif action == 4:
                             temp_img = TF.adjust_contrast(temp_img, random.random()*2)
-                        selected_inputs[i] = to_tensor(temp_img).cuda()
+                        #selected_inputs[i] = to_tensor(temp_img).cuda()
+                        selected_inputs[i] = to_tensor(temp_img).to(self.device)
                     #inputs[indices.squeeze()] # the inputs to be augmented
                     #sampled_actions[indices] # the sampled augmentations
                     # (0=>no select,1=>select w/ no aug, 2=>, horizontal flip, 3=> adjust brightness, 4=> adjust contrast)
@@ -621,7 +650,7 @@ class ACTeacherStudentModel(nn.Module):
 
                 input_pool.append(selected_inputs)
                 label_pool.append(selected_labels)
-                if count >= M:
+                if count >= selection_batch_size:
                     effective_num += count
                     break
 
@@ -655,7 +684,7 @@ class ACTeacherStudentModel(nn.Module):
 
 
             # TODO: add epoch based validation
-            if i_tau % int(len(student_dataloader)*student_dataloader.batch_size/M) == 0: # one epoch for student
+            if i_tau % int(len(student_dataloader)*student_dataloader.batch_size/selection_batch_size) == 0: # one epoch for student
                 logger.info('Teacher validation/ student validation: epoch {}'.format(student_epoch))
                 student_epoch += 1
                 student_iter = 0

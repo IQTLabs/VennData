@@ -38,8 +38,11 @@ def make_global_parameters(hparams):
 
 def main(hparams, run=None, gpu_num=0):
 
-    device = torch.device('cuda:{}'.format(gpu_num) if torch.cuda.is_available() else 'cpu')
-    torch.cuda.set_device(gpu_num)
+    if gpu_num == -1:
+        device = torch.device('cpu')
+    else:
+        device = torch.device('cuda:{}'.format(gpu_num) if torch.cuda.is_available() else 'cpu')
+        torch.cuda.set_device(gpu_num)
     # teacher train set 45%
     # teacher dev set 5%
     # student train set 50%
@@ -87,7 +90,8 @@ def main(hparams, run=None, gpu_num=0):
     else:
         model = ACTeacherStudentModel(_model_configs)
     model.train()
-    model.cuda()
+    model.to(device)
+    #model.cuda()
 
     # ================== set up lr scheduler=============================
     student_lr_scheduler = get_scheduler('student-cifar10')
@@ -107,7 +111,7 @@ def main(hparams, run=None, gpu_num=0):
     tau = hparams.optional.get('tau', 0.75) # 0.84
     #tau = 0.15
     threshold = hparams.optional.get('threshold', 0.5)
-    M = hparams.optional.get('M', 48) # original = 128
+    selection_batch_size = hparams.optional.get('selection_batch_size', 48) # original = 128
     max_non_increasing_steps = hparams.optional.get('max_non_increasing_steps', 10)
     num_classes = hparams.optional.get('num_classes', 10)
 
@@ -136,7 +140,7 @@ def main(hparams, run=None, gpu_num=0):
         'max_t': max_t,
         'tau': tau,
         'threshold': threshold,
-        'M': M,
+        'selection_batch_size': selection_batch_size,
         'max_non_increasing_steps': max_non_increasing_steps,
         'num_classes': num_classes,
         'use_vae': use_vae,

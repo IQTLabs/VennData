@@ -91,10 +91,13 @@ def get_dataloader(configs, seed=None):
     elif configs['dataset'] == 'bionic_regroup':
         dataset = torchvision.datasets.ImageFolder(os.path.join(configs['root'], 'data','lab41_bio','bionic_regroup'), transform=configs['transform'])
 
-        teacher_split = int(0.4 * len(dataset))
-        student_split = int(0.4 * len(dataset))
-        dev_split = int(0.10 * len(dataset))
-        test_split = int(0.10 * len(dataset))
+
+        split_ratios = [0.3, 0.3, 0.2, 0.2]
+
+        teacher_split = int(split_ratios[0] * len(dataset))
+        student_split = int(split_ratios[1] * len(dataset))
+        dev_split = int(split_ratios[2] * len(dataset))
+        test_split = int(split_ratios[3] * len(dataset))
         np.random.seed(seed)
         indices = np.random.permutation(len(dataset))
         splits = {

@@ -25,7 +25,7 @@ class ACTeacherNetwork(nn.Module):
             1. input_dim: int (for cifar-10&mnist, d = 25 (10(data feature) + 3(model feature) + 12(combined feature)))
         '''
         super(ACTeacherNetwork, self).__init__()
-        self.input_dim = configs.get('input_dim', 25)
+        self.input_dim = configs.get('input_dim', 25) # 2*num_classes + 2 + 3
         self.output_dim = configs.get('output_dim', 1)
         self.use_vae = configs.get('use_vae', False)
         if self.use_vae:

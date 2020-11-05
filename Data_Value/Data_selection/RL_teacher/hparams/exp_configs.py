@@ -1,6 +1,8 @@
 from .hparams import HParams
 from .register import register
 from core.models.resnet import ResNet34, ResNet18, ResNet50
+from core.models.vgg import VGG
+from core.models.cnn import CNNMini
 from core.helper_functions import evaluator
 import torchvision.transforms as transforms
 import pickle
@@ -15,24 +17,29 @@ def bionic_ac(extra_info):
     dataset = 'bionic_regroup'
     splits = ['teacher_train', 'student_train', 'dev', 'test']
     teacher_configs = {
-        'input_dim': 25,
+        'input_dim': 9,
         'output_dim': 1,
         'use_vae': False,
         'policy': 'actor_critic'
     }
     student_configs = {
-        'base_model': ResNet18(num_classes=2, linear_in=814592),
+        #'base_model': ResNet18(num_classes=2, num_blocks=[1,1,1,1], linear_in=202752),
+        #'base_model': VGG('VGG11', num_classes=2, in_linear=46080),
+        'base_model': CNNMini(num_classes=2, fc_in=292820),
         'evaluator': evaluator
     }
+    crop_width = 500
+    crop_height = 500
     transform_train = transforms.Compose([
         #transforms.RandomCrop(32, padding=4),
-        transforms.RandomCrop((1200,1400)),
+        transforms.RandomCrop((crop_width, crop_height)),
         #transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
     transform_test = transforms.Compose([
+        transforms.RandomCrop((crop_width, crop_height)),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
@@ -44,7 +51,7 @@ def bionic_ac(extra_info):
                 'split': splits[0],
                 'root': root,
                 'transform': transform_train,
-                'batch_size': 1,
+                'batch_size': 4,
                 'shuffle': True
             },
         'student_train':
@@ -53,7 +60,7 @@ def bionic_ac(extra_info):
                 'split': splits[1],
                 'root': root,
                 'transform': transform_train,
-                'batch_size': 1,
+                'batch_size': 4,
                 'shuffle': True
             },
         'dev':
@@ -62,7 +69,7 @@ def bionic_ac(extra_info):
                 'split': splits[2],
                 'root': root,
                 'transform': transform_test,
-                'batch_size': 1, #1250,
+                'batch_size': 24, #1250,
                 'shuffle': False
             },
         'test':
@@ -71,7 +78,7 @@ def bionic_ac(extra_info):
                 'split': splits[3],
                 'root': root,
                 'transform': transform_test,
-                'batch_size': 1, #1250,
+                'batch_size': 24, #1250,
                 'shuffle': False
             }
     }
@@ -94,7 +101,11 @@ def bionic_ac(extra_info):
             }
     }
 
-    optional = dict()
+    optional = {
+        'num_classes':2,
+        'selection_batch_size': 16,
+        'max_t': 300
+    }
     logger_configs = {
         'output_path': './log',
         'cfg_name': '%s-actor-critic' % dataset
@@ -296,7 +307,7 @@ def cifar10_l2t_augment(extra_info):
     }
 
     optional = {
-            'M': 32
+            'selection_batch_size': 32
     }
     logger_configs = {
         'output_path': './log',

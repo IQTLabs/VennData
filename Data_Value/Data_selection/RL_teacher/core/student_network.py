@@ -6,11 +6,12 @@ import torch
 import torch.nn as nn
 from misc.utils import to_var
 import numpy as np
+import time
 
 from core.models.resnet import ResNet34
 
 class StudentNetwork(nn.Module):
-    def __init__(self, configs):
+    def __init__(self, configs, device):
         '''
         Descriptions:
             Some details of the paper:
@@ -23,6 +24,7 @@ class StudentNetwork(nn.Module):
         super(StudentNetwork, self).__init__()
         self.base_model = configs['base_model']
         self.evaluator = configs['evaluator']
+        self.device = device
 
     def forward(self, data, configs):
         inputs, labels = data['inputs'], data['labels']
@@ -55,8 +57,8 @@ class StudentNetwork(nn.Module):
             #print('input shape - ',inputs.shape)
             optimizer.zero_grad()
             if flag:
-                inputs = to_var(inputs)
-                labels = to_var(labels)
+                inputs = to_var(inputs).to(self.device)
+                labels = to_var(labels).to(self.device)
             predicts = self.base_model(inputs)
 
             eval_res = self.evaluator(predicts, labels)
@@ -102,8 +104,8 @@ class StudentNetwork(nn.Module):
             if x.grad is not None:
                 x.grad.data.zero_()
         for idx, (inputs, labels) in enumerate(dataloader):
-            inputs = to_var(inputs)
-            labels = to_var(labels)
+            inputs = to_var(inputs).to(self.device)
+            labels = to_var(labels).to(self.device)
             predicts = self.base_model(inputs)
             eval_res = self.evaluator(predicts, labels)
             num_correct = eval_res['num_correct']
@@ -136,7 +138,6 @@ class StudentNetwork(nn.Module):
                 #print('par.grad = ',par.grad)
                 #print('g = ',g)
         # print ('Total: %d, correct: %d', all_samples, all_correct)
-
 
         if return_gradients:
             return all_correct/all_samples, loss_average/total_steps, gradient_samples
