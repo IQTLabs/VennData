@@ -627,9 +627,10 @@ class ACTeacherStudentModel(nn.Module):
                 _inputs = {'input': states, 'vae_z':vae_z}
                 predicts, value = teacher(_inputs, None)
 
-                mislabel_filtered = [a==b and a==True for a,b in zip((predicts.cpu().numpy().squeeze()<threshold), mislabel_idx)]
-                count_mislabeled += np.sum(mislabel_idx)
-                count_mislabeled_filtered += np.sum(mislabel_filtered)
+                if mislabel:
+                    mislabel_filtered = [a==b and a==True for a,b in zip((predicts.cpu().numpy().squeeze()<threshold), mislabel_idx)]
+                    count_mislabeled += np.sum(mislabel_idx)
+                    count_mislabeled_filtered += np.sum(mislabel_filtered)
                 # predicts: 1 to use , 0 to filter out
                 if self.is_augment_teacher: # data augment teacher
                     teacher_actions = torch.argmax(predicts, dim=1) # n values (in the range of 0:action_space)
@@ -730,6 +731,7 @@ class ACTeacherStudentModel(nn.Module):
                 logger.info('Testing on Test: accuracy: %5.4f, best: %5.4f' % (acc, best_acc_on_test))
                 effnum_acc_curves.append((effective_num, acc))
 
-                writer.add_scalar('percent_filtered_from_mislabeled', count_mislabeled_filtered/count_mislabeled, i_tau)
+                if mislabel:
+                    writer.add_scalar('percent_filtered_from_mislabeled', count_mislabeled_filtered/count_mislabeled, i_tau)
 
         return effnum_acc_curves
