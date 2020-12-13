@@ -114,6 +114,11 @@ def main(hparams, run=None, gpu_num=0):
     selection_batch_size = hparams.optional.get('selection_batch_size', 48) # original = 128
     max_non_increasing_steps = hparams.optional.get('max_non_increasing_steps', 10)
     num_classes = hparams.optional.get('num_classes', 10)
+    mislabel_rate = hparams.optional.get('mislabel_rate', 0)
+    if mislabel_rate == 0:
+        mislabel = False
+    else:
+        mislabel = True
 
     # =============== pack fit configs for fitting teacher model ========
     fit_configs = {
@@ -144,7 +149,9 @@ def main(hparams, run=None, gpu_num=0):
         'max_non_increasing_steps': max_non_increasing_steps,
         'num_classes': num_classes,
         'use_vae': use_vae,
-        'vae': vae
+        'vae': vae,
+        'mislabel': mislabel,
+        'mislabel_rate': mislabel_rate
     }
     print ('Fitting the teacher starts.............')
     model.fit_teacher(fit_configs)
